@@ -1,0 +1,179 @@
+report YGMK_BDC_SESSION
+       no standard page heading line-size 255.
+
+*include bdcrecx1_s.
+DATA:   BDCDATA LIKE BDCDATA    OCCURS 0 WITH HEADER LINE,
+      it_raw type TRUXS_T_TEXT_DATA.
+
+CONSTANTs lv_KZSEL(1) type c value 'X'. "-----------------> insted of hardcoding i am passing 'X' Value into one constant.
+
+parameters: p_file type localfile.
+
+*
+*** Generated data section with specific formatting - DO NOT CHANGE  ***
+data: begin of record occurs 0,
+* data element: MBRSH
+        MBRSH_001(001),
+* data element: MTART
+        MTART_002(004),
+* data element: MAKTX 
+*  MSICHTAUSW-KZSEL(01)--------------------------> Comment this field because in the flat flie the field value is 'X' so i want to hardcode this value.
+* data element: MAKTX 
+        MAKTX_004(040),
+* data element: MEINS
+        MEINS_005(003),
+* data element: MATKL
+        MATKL_006(009),
+      end of record.
+
+at SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+  CALL FUNCTION 'F4_FILENAME'
+   EXPORTING
+     PROGRAM_NAME        = SYST-CPROG
+     DYNPRO_NUMBER       = SYST-DYNNR
+*     FIELD_NAME          = ' '
+   IMPORTING
+     FILE_NAME           = p_file.
+
+
+start-of-selection.
+
+CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+  EXPORTING
+*   I_FIELD_SEPERATOR          =
+   I_LINE_HEADER              = 'X'
+    i_tab_raw_data             = it_raw
+   I_FILENAME                 = p_file
+*   I_STEP                     = 1
+*   I_FILENAME_LONG            =
+  tables
+    i_tab_converted_data       = record
+ EXCEPTIONS
+   CONVERSION_FAILED          = 1
+   OTHERS                     = 2
+          .
+
+*perform open_dataset using dataset.
+*perform open_group.
+
+CALL FUNCTION 'BDC_OPEN_GROUP'   "-------------------------->  this fm is used to opening the session.       
+ EXPORTING
+*   CLIENT                    = SY-MANDT
+*   DEST                      = FILLER8
+   GROUP                     = 'YGMK_MM01_1'  "-------------------------->  this is the session name it's used to find our prg in sm35 tcode. 
+*   HOLDDATE                  = FILLER8
+   KEEP                      = 'X'
+*   USER                      = FILLER12
+*   RECORD                    = FILLER1
+*   PROG                      = SY-CPROG
+*   DCPFM                     = '%'
+*   DATFM                     = '%'
+*   APP_AREA                  = FILLER12
+*   LANGU                     = SY-LANGU
+* IMPORTING
+*   QID                       =
+ EXCEPTIONS
+   CLIENT_INVALID            = 1
+   DESTINATION_INVALID       = 2
+   GROUP_INVALID             = 3
+   GROUP_IS_LOCKED           = 4
+   HOLDDATE_INVALID          = 5
+   INTERNAL_ERROR            = 6
+   QUEUE_ERROR               = 7
+   RUNNING                   = 8
+   SYSTEM_LOCK_ERROR         = 9
+   USER_INVALID              = 10
+   OTHERS                    = 11.
+
+
+
+loop at record.
+
+*read dataset dataset into record.
+*if sy-subrc <> 0. exit. endif.
+
+perform bdc_dynpro      using 'SAPLMGMM' '0060'.
+perform bdc_field       using 'BDC_CURSOR'
+                              'RMMG1-MTART'.
+perform bdc_field       using 'BDC_OKCODE'
+                              '=ENTR'.
+perform bdc_field       using 'RMMG1-MBRSH'
+                              record-MBRSH_001.
+perform bdc_field       using 'RMMG1-MTART'
+                              record-MTART_002.
+perform bdc_dynpro      using 'SAPLMGMM' '0070'.
+perform bdc_field       using 'BDC_CURSOR'
+                              'MSICHTAUSW-DYTXT(01)'.
+perform bdc_field       using 'BDC_OKCODE'
+                              '=ENTR'.
+perform bdc_field       using 'MSICHTAUSW-KZSEL(01)'
+                               lv_KZSEL.                "---------------------------------------> instand of harding passing 'X' value to constant.
+perform bdc_dynpro      using 'SAPLMGMM' '4004'.
+perform bdc_field       using 'BDC_OKCODE'
+                              '=BU'.
+perform bdc_field       using 'MAKT-MAKTX'
+                              record-MAKTX_004.
+perform bdc_field       using 'BDC_CURSOR'
+                              'MARA-MATKL'.
+perform bdc_field       using 'MARA-MEINS'
+                              record-MEINS_005.
+perform bdc_field       using 'MARA-MATKL'
+                              record-MATKL_006.
+*perform bdc_transaction using 'MM01'.
+
+CALL FUNCTION 'BDC_INSERT'     "-------------------------->  this fm is used to insert the data to record to bdcdata. 
+                                                             " insted of call transaction syntax we are use this fm.
+ EXPORTING
+   TCODE                  = 'MM01'
+*   POST_LOCAL             = NOVBLOCAL
+*   PRINTING               = NOPRINT
+*   SIMUBATCH              = ' '
+*   CTUPARAMS              = ' '
+  TABLES
+    dynprotab              = bdcdata[]
+ EXCEPTIONS
+   INTERNAL_ERROR         = 1
+   NOT_OPEN               = 2
+   QUEUE_ERROR            = 3
+   TCODE_INVALID          = 4
+   PRINTING_INVALID       = 5
+   POSTING_INVALID        = 6
+   OTHERS                 = 7.
+
+CLEAR bdcdata[].
+CLEAR record.
+
+endloop.
+
+CALL FUNCTION 'BDC_CLOSE_GROUP'   "-------------------------->  this fm is used to close the session. 
+ EXCEPTIONS
+   NOT_OPEN          = 1
+   QUEUE_ERROR       = 2
+   OTHERS            = 3.
+
+
+*perform close_group.
+*perform close_dataset using dataset.
+
+*----------------------------------------------------------------------*
+*        Start new screen                                              *
+*----------------------------------------------------------------------*
+FORM BDC_DYNPRO USING PROGRAM DYNPRO.
+  CLEAR BDCDATA.
+  BDCDATA-PROGRAM  = PROGRAM.
+  BDCDATA-DYNPRO   = DYNPRO.
+  BDCDATA-DYNBEGIN = 'X'.
+  APPEND BDCDATA.
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*        Insert field                                                  *
+*----------------------------------------------------------------------*
+FORM BDC_FIELD USING FNAM FVAL.
+*  IF FVAL <> NODATA.
+    CLEAR BDCDATA.
+    BDCDATA-FNAM = FNAM.
+    BDCDATA-FVAL = FVAL.
+    APPEND BDCDATA.
+*  ENDIF.
+ENDFORM.
