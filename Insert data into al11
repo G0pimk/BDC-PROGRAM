@@ -1,0 +1,59 @@
+*&---------------------------------------------------------------------*
+*& Report YGMK_APPLICATION_SEVER
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT ygmk_application_sever.
+
+TYPES: BEGIN OF ty_flatfile,
+         mbrsh(1)    TYPE c,
+         mtart(4)    TYPE  c,
+         kzsel_01(1) TYPE c,
+         maktx(40)   TYPE c,
+         meins(3)    TYPE c,
+         matkl(9)    TYPE c,
+       END OF ty_flatfile.
+
+data: it_file type table of ty_flatfile,
+      wa_file type ty_flatfile,
+      it_raw type TRUXS_T_TEXT_DATA.  "----------------------------------> decalr structure same as flat file.
+
+data(lv_path) = '/usr/sap/ccms/mm01.txt'. "----------------------------------> select which location you want to insert the data in AL11
+
+PARAMETERS: p_file type localfile.  "----------------------------------> parameter for upload the file
+
+at SELECTION-SCREEN on VALUE-REQUEST FOR p_file.  "----------------------------------> provie f4 help for selecting file
+  CALL FUNCTION 'F4_FILENAME'  "----------------------------------> upload the file.
+   EXPORTING
+     PROGRAM_NAME        = SYST-CPROG
+     DYNPRO_NUMBER       = SYST-DYNNR
+*     FIELD_NAME          = ' '
+   IMPORTING
+     FILE_NAME           = p_file .
+
+  START-OF-SELECTION.
+  CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'  "----------------------------------> convert text file to sap internal table
+    EXPORTING
+     I_FIELD_SEPERATOR          = 'X'
+*     I_LINE_HEADER              =
+      i_tab_raw_data             = it_raw
+     I_FILENAME                 = p_file
+*     I_STEP                     = 1
+*     I_FILENAME_LONG            =
+    tables
+      i_tab_converted_data       = it_file  "----------------------------------> data converted and stored in it_file
+   EXCEPTIONS
+     CONVERSION_FAILED          = 1
+     OTHERS                     = 2
+            .
+
+OPEN DATASET lv_path for OUTPUT in TEXT MODE ENCODING DEFAULT.  "----------------------------------> open data lv_path
+LOOP AT it_file into wa_file.  "----------------------------------> loop our it table into wa because insert data record by record
+TRANSFER wa_file to lv_path.  "----------------------------------> insterting data record by record
+ENDLOOP.
+
+CLOSE DATASET lv_path.
+
+IF sy-subrc = 0.
+MESSAGE 'data insterted sucessfully' TYPE 'I'.
+ENDIF.
