@@ -1,0 +1,47 @@
+*&---------------------------------------------------------------------*
+*& Report YGMK_APPLICATION_SEVER_PICK
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT ygmk_application_sever_pick.
+
+TYPES: BEGIN OF ty_flatfile,
+         mbrsh(1)    TYPE c,
+         mtart(4)    TYPE  c,
+         kzsel_01(1) TYPE c,
+         maktx(40)   TYPE c,
+         meins(3)    TYPE c,
+         matkl(9)    TYPE c,
+       END OF ty_flatfile.
+
+DATA: it_file TYPE TABLE OF ty_flatfile, "----------------------------------> declar it table and wa from types
+      wa_file TYPE ty_flatfile. "----------------------------------> create structure which type of data you want to pick from application sever
+
+DATA(lv_path) = '/usr/sap/ccms/mm01.txt'. "----------------------------------> data location
+
+OPEN DATASET lv_path FOR INPUT IN TEXT MODE ENCODING DEFAULT. "----------------------------------> we are taking input from application sever
+IF sy-subrc = 0.
+  DO.                                     "----------------------------------> we don't know how many records are available that's why here i am using do instad of loop at.
+    IF sy-subrc = 0.
+      READ DATASET lv_path INTO wa_file. "----------------------------------> read dataset path and move record into wa
+      IF sy-subrc = 0.
+
+        APPEND wa_file TO it_file. "----------------------------------> appending wa data into it table
+        CLEAR wa_file. "----------------------------------> clearing the wa .. if you don't clear the next record may overwrite here
+
+      ENDIF.
+    ELSE.
+      EXIT.
+    ENDIF.
+  ENDDO.
+ENDIF.
+
+
+
+CLOSE DATASET lv_path. "----------------------------------> close the dataset.
+IF sy-subrc = 0.
+  MESSAGE 'data picked from Application sever' TYPE 'I'.
+
+ENDIF.
+
+cl_demo_output=>display_data( it_file ).
