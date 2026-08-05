@@ -1,0 +1,93 @@
+*&---------------------------------------------------------------------*
+*& Report YGMK_BAPI_BANK
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT ygmk_bapi_bank.
+
+TYPES: BEGIN OF ty_tab,
+         bankkey   TYPE bapi1011_key-bank_ctry, "------------------------------------>
+         banks     TYPE bapi1011_key-bank_key,  " crating the strucure based on flat file.
+         bank_name TYPE banka,                  "
+         street    TYPE stras_gp,               "
+         city      TYPE ort01_gp,               "
+         bank_no   TYPE bankl,                  "
+       END OF ty_tab,                           "------------------------------------>
+
+       BEGIN OF ty_msg,                  "------------------------------------>
+         line TYPE i,                    " crate one internal table to display the error msg
+         msg  TYPE string,               "
+       END OF ty_msg.                    "------------------------------------>
+
+DATA: it_msg TYPE TABLE OF ty_msg,
+      wa_msg TYPE ty_msg.
+
+
+DATA: it_import TYPE TABLE OF ty_tab,
+      wa_import TYPE ty_tab.
+
+DATA : it_raw     TYPE truxs_t_text_data,
+       wa_address TYPE bapi1011_address,
+       wa_return  TYPE  bapiret2.            "------------------------------------>   declar wa return to store error msg
+
+PARAMETERS p_file TYPE localfile.               "------------------------------------>  parameter for upload file
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+
+  CALL FUNCTION 'F4_FILENAME'
+    EXPORTING
+      program_name  = syst-cprog
+      dynpro_number = syst-dynnr
+*     FIELD_NAME    = ' '
+    IMPORTING
+      file_name     = p_file.
+
+START-OF-SELECTION.
+  CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+    EXPORTING
+*     I_FIELD_SEPERATOR    =
+      i_line_header        = 'X'
+      i_tab_raw_data       = it_raw
+      i_filename           = p_file
+*     I_STEP               = 1
+*     I_FILENAME_LONG      =
+    TABLES
+      i_tab_converted_data = it_import
+    EXCEPTIONS
+      conversion_failed    = 1
+      OTHERS               = 2.
+
+  LOOP AT it_import ASSIGNING FIELD-SYMBOL(<fs_wa>). "------------------------------------>  loop it table to wa/fs to pass the data into bapi fm
+    DATA(lv_num) = sy-tabix.
+
+    wa_address-bank_name = <fs_wa>-bank_name. "------------------------------------>   passing wa_address from import wa
+    wa_address-bank_no = <fs_wa>-bank_no.
+    wa_address-city = <fs_wa>-city.
+    wa_address-street = <fs_wa>-street.
+
+    CALL FUNCTION 'BAPI_BANK_CREATE' "------------------------------------>  call bapi fm to create business object
+      EXPORTING
+        bank_ctry    = <fs_wa>-bankkey "------------------------------------>   passing wa_import
+        bank_key     = <fs_wa>-banks
+        bank_address = wa_address   "------------------------------------>   this is wa we need to fill wa first then pass it
+      IMPORTING
+        return       = wa_return.
+
+    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' "------------------------------------>  it's mandatory to update the changes in db
+     EXPORTING
+       WAIT          = 'X'.
+
+    IF wa_return IS NOT INITIAL.
+      wa_msg-msg = wa_return-message.
+      wa_msg-line = lv_num.
+      APPEND wa_msg TO it_msg. "------------------------------------>   filling error msg table
+    ENDIF.
+
+ clear: wa_msg, wa_address, wa_return.
+  ENDLOOP.
+
+  LOOP AT  it_msg INTO wa_msg.
+
+    WRITE : wa_msg-line, wa_msg-msg. "------------------------------------>  display the error msg.
+
+  ENDLOOP.
