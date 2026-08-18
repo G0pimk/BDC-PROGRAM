@@ -82,26 +82,24 @@ START-OF-SELECTION.
       wa_msg-line = lv_num.
       APPEND wa_msg TO it_msg. "------------------------------------>   filling error msg table
 
-    ELSE.
-      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' "------------------------------------>  it's mandatory to update the changes in db
-        EXPORTING
-          wait = 'X'.
-    ENDIF.
-
-    CLEAR: wa_msg, wa_address, wa_return.
-  ENDLOOP.
-
-  IF  it_msg IS NOT INITIAL. "------------------------------------------> check the error msg and move the error msg to another it tables
-
-    LOOP AT it_msg ASSIGNING FIELD-SYMBOL(<fs_msg>) WHERE msg_type = 'E'.
-
+      IF it_msg is not INITIAL. "----------------------------------------------------> checking the internal table if msg type 'E' i am moving the error msg into another internal table.
+        READ TABLE it_msg ASSIGNING FIELD-SYMBOL(<fs_msg>) with KEY msg_type = 'E'.
       IF sy-subrc = 0.
         wa_error-line = <fs_msg>-line.
         wa_error-msg = <fs_msg>-msg.
         APPEND wa_error TO it_error.
+
+        ELSE.
+          CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' -------------------------------------> if error msg is not available update the record into database.
+           EXPORTING
+             WAIT          = 'X'.
       ENDIF.
-    ENDLOOP.
-  ENDIF.
+
+    ENDIF.
+
+    CLEAR: wa_msg, wa_address, wa_return.
+    ENDIF.
+  ENDLOOP.
 
   IF it_error IS NOT INITIAL. "----------------------> display error msg here
 
@@ -112,6 +110,6 @@ START-OF-SELECTION.
     ENDLOOP.
 
   ELSE.
-    WRITE: 'DATA CONVERTED SUCESSFULLY' .
+    WRITE: / 'DATA CONVERTED SUCESSFULLY' .
 
   ENDIF.
