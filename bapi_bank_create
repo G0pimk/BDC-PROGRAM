@@ -14,13 +14,16 @@ TYPES: BEGIN OF ty_tab,
          bank_no   TYPE bankl,                  "
        END OF ty_tab,                           "------------------------------------>
 
-       BEGIN OF ty_msg,                  "------------------------------------>
-         line TYPE i,                    " crate one internal table to display the error msg
-         msg  TYPE string,               "
+       BEGIN OF ty_msg,
+         msg_type TYPE bapi_mtype,       "------------------------------------>
+         line     TYPE i,                    " crate one internal table to display the error msg
+         msg      TYPE string,               "
        END OF ty_msg.                    "------------------------------------>
 
-DATA: it_msg TYPE TABLE OF ty_msg,
-      wa_msg TYPE ty_msg.
+DATA: it_msg   TYPE TABLE OF ty_msg,
+      wa_msg   TYPE ty_msg,
+      it_error TYPE TABLE OF ty_msg,
+      wa_error TYPE ty_msg.
 
 
 DATA: it_import TYPE TABLE OF ty_tab,
@@ -73,21 +76,42 @@ START-OF-SELECTION.
       IMPORTING
         return       = wa_return.
 
-    CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' "------------------------------------>  it's mandatory to update the changes in db
-     EXPORTING
-       WAIT          = 'X'.
-
     IF wa_return IS NOT INITIAL.
+      wa_msg-msg_type = wa_return-type.
       wa_msg-msg = wa_return-message.
       wa_msg-line = lv_num.
       APPEND wa_msg TO it_msg. "------------------------------------>   filling error msg table
+
+    ELSE.
+      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT' "------------------------------------>  it's mandatory to update the changes in db
+        EXPORTING
+          wait = 'X'.
     ENDIF.
 
- clear: wa_msg, wa_address, wa_return.
+    CLEAR: wa_msg, wa_address, wa_return.
   ENDLOOP.
 
-  LOOP AT  it_msg INTO wa_msg.
+  IF  it_msg IS NOT INITIAL. "------------------------------------------> check the error msg and move the error msg to another it tables
 
-    WRITE : wa_msg-line, wa_msg-msg. "------------------------------------>  display the error msg.
+    LOOP AT it_msg ASSIGNING FIELD-SYMBOL(<fs_msg>) WHERE msg_type = 'E'.
 
-  ENDLOOP.
+      IF sy-subrc = 0.
+        wa_error-line = <fs_msg>-line.
+        wa_error-msg = <fs_msg>-msg.
+        APPEND wa_error TO it_error.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+  IF it_error IS NOT INITIAL. "----------------------> display error msg here
+
+    LOOP AT  it_error INTO wa_error.
+
+      WRITE : wa_error-line, wa_error-msg. "------------------------------------>  display the error msg.
+
+    ENDLOOP.
+
+  ELSE.
+    WRITE: 'DATA CONVERTED SUCESSFULLY' .
+
+  ENDIF.
