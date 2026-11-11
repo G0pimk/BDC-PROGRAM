@@ -1,0 +1,40 @@
+*&---------------------------------------------------------------------*
+*& Report YGMK_OOABAP_PRG7
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT YGMK_OOABAP_PRG7.
+
+PARAMETERS p_a type i.
+PARAMETERS p_b type string.
+
+data(obj) = new YGMK_CL_EXP1( ).    ---------------------------------> to call our method
+data(obj_ex) = new CX_SY_ZERODIVIDE( ). ---------------------------------> to call exceptions standard msg
+data(obj_ex1) = new cx_sy_conversion_no_number( ). ---------------------------------> to call exceptions standard msg
+
+TRY.
+call METHOD obj->get_data
+  EXPORTING
+    iv_a = p_a
+    iv_b = p_b
+  IMPORTING
+    e_c  = data(lv_res)
+  .
+CATCH cx_sy_zerodivide into obj_ex.           " System Exception Involving Division by Zero
+  call METHOD obj_ex->get_longtext
+    RECEIVING
+      result            =   data(lv_text)               " ---
+    .
+  write :/ lv_text.
+
+CATCH cx_sy_conversion_no_number into obj_ex1 . " System exception in transformation to a number
+call METHOD obj_ex1->get_longtext
+  RECEIVING
+    result            =    data(text)              " ---
+  .
+
+write:/ text.
+
+ENDTRY.
+
+write: lv_res.
